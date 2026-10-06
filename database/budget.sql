@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS rem_controladoria.budget_plans (
  year integer NOT NULL CHECK(year BETWEEN 2020 AND 2100),
  company text NOT NULL CHECK(company IN ('ALPAN','REM Construtora','REM Vendas')),
  sector text NOT NULL REFERENCES rem_controladoria.areas(name),
- amounts jsonb NOT NULL DEFAULT '{}'::jsonb,
+ amounts jsonb NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(amounts)='object'),
  status text NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','submitted','approved','changes')),
  version integer NOT NULL DEFAULT 1,
  note text NOT NULL DEFAULT '',

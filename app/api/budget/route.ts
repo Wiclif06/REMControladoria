@@ -31,7 +31,7 @@ export async function POST(req:Request){try{
  const result=await db().prepare(`WITH saved AS (
  INSERT INTO budget_plans(year,company,sector,amounts,status,note,updated_by) VALUES (?,?,?,?::jsonb,?,?,?)
  ON CONFLICT(year,company,sector) DO UPDATE SET amounts=excluded.amounts,status=excluded.status,note=excluded.note,updated_by=excluded.updated_by,updated_at=now(),version=budget_plans.version+1 WHERE budget_plans.version=?
- RETURNING *), audited AS (INSERT INTO budget_history(id,year,company,sector,actor,action,version,snapshot) SELECT ?::uuid,year,company,sector,?,?,version,to_jsonb(saved) FROM saved RETURNING id) SELECT saved.* FROM saved JOIN audited ON true`).bind(b.year,b.company,b.sector,JSON.stringify(amounts),status,b.note.trim(),m.username,b.version,crypto.randomUUID(),m.username,b.action).first();
+ RETURNING *), audited AS (INSERT INTO budget_history(id,year,company,sector,actor,action,version,snapshot) SELECT ?::uuid,year,company,sector,?,?,version,to_jsonb(saved) FROM saved RETURNING id) SELECT saved.* FROM saved JOIN audited ON true`).bind(b.year,b.company,b.sector,amounts,status,b.note.trim(),m.username,b.version,crypto.randomUUID(),m.username,b.action).first();
  if(!result)return fail('O orçamento foi alterado por outro usuário. Recarregue antes de salvar.',409);
  return Response.json({ok:true,plan:result});
 }catch(e){console.error(e);return fail('Não foi possível salvar. Seu preenchimento foi preservado.',503);}}
