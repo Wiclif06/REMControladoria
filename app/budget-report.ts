@@ -1,12 +1,12 @@
 import {BUDGET_STAGES,MONTHS} from './budget-catalog';
 import {cell,excelRow,worksheet,excelFile,column} from './excel';
 import {sumMonths,STATUS_LABELS,type BudgetPlan} from './budget-types';
-export function makeBudgetReport(plans:BudgetPlan[],year:number){
+export function makeBudgetReport(plans:BudgetPlan[],year:number,stages:readonly (typeof BUDGET_STAGES)[number][]=BUDGET_STAGES){
 const rows:string[]=[],merges=['A1:O1','A2:O2'];let n=1;rows.push(excelRow(n,cell(n++,0,'REM CONSTRUTORA | CONTROLADORIA',24),30));rows.push(excelRow(n,cell(n++,0,`Orçamento ${year} • Despesas Administrativas`,8),28));rows.push(excelRow(4,['ETAPA','DESCRIÇÃO',...MONTHS.map(m=>`${m.toUpperCase()} / ${year}`),'TOTAL'].map((v,c)=>cell(4,c,v,4)).join(''),30));n=5;const totalRows:number[]=[];
 for(const plan of plans){rows.push(excelRow(n,cell(n,0,`Área: ${plan.sector} | Empresa: ${plan.company} | ${STATUS_LABELS[plan.status]} | Responsável: ${plan.updated_by}`,24),30));merges.push(`A${n}:O${n}`);n++;let cat='',group='';let categoryRow=0,groupRow=0;let groupDetail:number[]=[];
 const totalRow=(r:number,refs:number[])=>{const values=Array.from({length:12},(_,m)=>refs.reduce((sum,id)=>sum+(plan.amounts[String(id)]?.[m]||0),0)/100);return values.map((v,m)=>cell(r,m+2,v,30,refs.length?refs.map(id=>`${column(m+2)}${stageExcelRows[id]}`).join('+'):'0')).join('')+cell(r,14,values.reduce((a,b)=>a+b,0),31,`SUM(C${r}:N${r})`);};
 const stageExcelRows:Record<number,number>={};const subtotals:{row:number;ids:number[]}[]=[];let catIds:number[]=[];
-for(const stage of BUDGET_STAGES){if(stage.category!==cat){if(categoryRow)subtotals.push({row:categoryRow,ids:catIds});cat=stage.category;catIds=[];categoryRow=n;rows.push(excelRow(n,cell(n,1,cat,24),27));n++;group='';}
+for(const stage of stages){if(stage.category!==cat){if(categoryRow)subtotals.push({row:categoryRow,ids:catIds});cat=stage.category;catIds=[];categoryRow=n;rows.push(excelRow(n,cell(n,1,cat,24),27));n++;group='';}
 if(stage.group!==group){if(groupRow)subtotals.push({row:groupRow,ids:groupDetail});group=stage.group;groupDetail=[];groupRow=n;rows.push(excelRow(n,cell(n,1,group,8),25));n++;}
 const values=plan.amounts[stage.id]||Array(12).fill(0);stageExcelRows[Number(stage.id)]=n;groupDetail.push(Number(stage.id));catIds.push(Number(stage.id));rows.push(excelRow(n,cell(n,0,stage.code)+cell(n,1,stage.name)+values.map((v,m)=>cell(n,m+2,v/100,30)).join('')+cell(n,14,values.reduce((a,b)=>a+b,0)/100,31,`SUM(C${n}:N${n})`)));n++;}
 if(categoryRow)subtotals.push({row:categoryRow,ids:catIds});if(groupRow)subtotals.push({row:groupRow,ids:groupDetail});for(const sub of subtotals){const idx=rows.findIndex(s=>s.startsWith(`<row r="${sub.row}"`));rows[idx]=rows[idx].replace('</row>',totalRow(sub.row,sub.ids)+'</row>');}
