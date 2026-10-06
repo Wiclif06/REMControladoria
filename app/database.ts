@@ -1,0 +1,25 @@
+import postgres from 'postgres';
+let client:ReturnType<typeof postgres>|undefined;
+function connection(){
+ if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL não configurada');
+ return client??=postgres(process.env.DATABASE_URL,{max:3,prepare:false,ssl:'require',idle_timeout:20,connect_timeout:10});
+}
+function translate(query:string){
+ const ignore=/INSERT OR IGNORE/i.test(query);
+ let sql=query.replace(/INSERT OR IGNORE/gi,'INSERT');
+ if(ignore)sql+=' ON CONFLICT DO NOTHING';
+ let index=0;return sql.replace(/\?/g,()=>`$${++index}`);
+}
+class Statement{
+ constructor(readonly query:string,readonly values:any[]=[]){ }
+ bind(...values:any[]){return new Statement(this.query,values);}
+ async all(){return {results:Array.from(await connection().unsafe(translate(this.query),this.values))};}
+ async first<T=Record<string,unknown>>():Promise<T|null>{return (await this.all()).results[0] as T??null;}
+ async run(){await connection().unsafe(translate(this.query),this.values);return {success:true};}
+}
+export function database(){return {
+ prepare:(query:string)=>new Statement(query),
+ batch:async (statements:Statement[])=>connection().begin(async transaction=>{
+  const results=[];for(const statement of statements){await transaction.unsafe(translate(statement.query),statement.values);results.push({success:true});}return results;
+ })
+};}
