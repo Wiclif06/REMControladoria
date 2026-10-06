@@ -2,11 +2,11 @@ import postgres from 'postgres';
 let client:ReturnType<typeof postgres>|undefined;
 function connection(){
  if(!process.env.DATABASE_URL)throw new Error('DATABASE_URL não configurada');
- return client??=postgres(process.env.DATABASE_URL,{max:3,prepare:false,ssl:'require',idle_timeout:20,connect_timeout:10});
+ return client??=postgres(process.env.DATABASE_URL,{max:1,prepare:false,ssl:'require',idle_timeout:20,connect_timeout:10});
 }
 function translate(query:string){
  const ignore=/INSERT OR IGNORE/i.test(query);
- let sql=query.replace(/INSERT OR IGNORE/gi,'INSERT');
+ let sql=query.replace(/INSERT OR IGNORE/gi,'INSERT').replace(/\b(employees|app_users|areas|auth_attempts|sessions|payroll_rules)\b/g, 'rem_controladoria.$1');
  if(ignore)sql+=' ON CONFLICT DO NOTHING';
  let index=0;return sql.replace(/\?/g,()=>`$${++index}`);
 }

@@ -1,4 +1,7 @@
 BEGIN;
+CREATE SCHEMA IF NOT EXISTS rem_controladoria;
+REVOKE ALL ON SCHEMA rem_controladoria FROM PUBLIC;
+SET LOCAL search_path = rem_controladoria, pg_catalog;
 CREATE TABLE IF NOT EXISTS employees (
  id text PRIMARY KEY, name text NOT NULL, position text NOT NULL, sector text NOT NULL,
  contract text NOT NULL CHECK (contract IN ('CLT','PJ')), salary integer NOT NULL,
@@ -26,4 +29,12 @@ ALTER TABLE auth_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payroll_rules ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON employees,app_users,areas,auth_attempts,sessions,payroll_rules FROM PUBLIC;
+GRANT USAGE ON SCHEMA rem_controladoria TO rem_controladoria_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA rem_controladoria TO rem_controladoria_app;
+CREATE POLICY rem_app ON employees TO rem_controladoria_app USING (true) WITH CHECK (true);
+CREATE POLICY rem_app ON app_users TO rem_controladoria_app USING (true) WITH CHECK (true);
+CREATE POLICY rem_app ON areas TO rem_controladoria_app USING (true) WITH CHECK (true);
+CREATE POLICY rem_app ON auth_attempts TO rem_controladoria_app USING (true) WITH CHECK (true);
+CREATE POLICY rem_app ON sessions TO rem_controladoria_app USING (true) WITH CHECK (true);
+CREATE POLICY rem_app ON payroll_rules TO rem_controladoria_app USING (true) WITH CHECK (true);
 COMMIT;
