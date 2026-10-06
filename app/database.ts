@@ -6,7 +6,7 @@ function connection(){
 }
 function translate(query:string){
  const ignore=/INSERT OR IGNORE/i.test(query);
- let sql=query.replace(/INSERT OR IGNORE/gi,'INSERT').replace(/\b(employees|app_users|areas|auth_attempts|sessions|payroll_rules)\b/g, 'rem_controladoria.$1');
+ let sql=query.replace(/INSERT OR IGNORE/gi,'INSERT').replace(/\b(employees|app_users|areas|auth_attempts|sessions|payroll_rules|budget_plans|budget_history)\b/g, 'rem_controladoria.$1');
  if(ignore)sql+=' ON CONFLICT DO NOTHING';
  let index=0;return sql.replace(/\?/g,()=>`$${++index}`);
 }
