@@ -7,7 +7,8 @@ const fail=(error:string,status=400)=>Response.json({error},{status});
 const validYear=(y:number)=>Number.isInteger(y)&&y>=2020&&y<=2100;
 export async function GET(req:Request){try{
  const m=await getMember(req);if(!m)return fail('Faça login para continuar.',401);
- const year=Number(new URL(req.url).searchParams.get('year')||2027);if(!validYear(year))return fail('Ano inválido.');
+ const params=new URL(req.url).searchParams;const requestedSector=params.get('sector');if(m.role!=='admin'&&requestedSector&&requestedSector!==m.sector)return fail('Este orçamento pertence a outro setor.',403);
+ const year=Number(params.get('year')||2027);if(!validYear(year))return fail('Ano inválido.');
  const plans=(await (m.role==='admin'?db().prepare('SELECT * FROM budget_plans WHERE year=? ORDER BY company,sector').bind(year):db().prepare('SELECT * FROM budget_plans WHERE year=? AND sector=? ORDER BY company').bind(year,m.sector)).all()).results;
  const history=(await (m.role==='admin'?db().prepare('SELECT id,year,company,sector,actor,action,version,created_at FROM budget_history WHERE year=? ORDER BY created_at DESC LIMIT 100').bind(year):db().prepare('SELECT id,year,company,sector,actor,action,version,created_at FROM budget_history WHERE year=? AND sector=? ORDER BY created_at DESC LIMIT 100').bind(year,m.sector)).all()).results;
  return Response.json({plans,history},{headers:{'Cache-Control':'no-store'}});
