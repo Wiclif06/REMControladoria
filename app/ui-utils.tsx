@@ -1,0 +1,12 @@
+'use client';
+import {useEffect,useRef,type ReactNode} from 'react';
+import {X} from 'lucide-react';
+export const FULL_MONTHS=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+export const formatMoney=(v:number)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v/100);
+export function normalize(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();}
+export function Dialog({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:ReactNode;wide?:boolean}){
+ const ref=useRef<HTMLElement>(null),close=useRef(onClose);close.current=onClose;
+ useEffect(()=>{const previous=document.activeElement as HTMLElement,overflow=document.body.style.overflow;document.body.style.overflow='hidden';ref.current?.focus();const key=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();close.current();}if(e.key==='Tab'){const items=[...ref.current!.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href]')].filter(el=>el.getClientRects().length);if(!items.length){e.preventDefault();return;}const first=items[0],last=items[items.length-1];if(e.shiftKey&&(document.activeElement===first||document.activeElement===ref.current)){e.preventDefault();last.focus();}else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===ref.current)){e.preventDefault();first.focus();}}};document.addEventListener('keydown',key);return()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);previous?.focus();};},[]);
+ return <div className="overlay"><section ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label={title} className={'modal enhanced-dialog '+(wide?'wide-dialog':'')}><div className="modal-head"><h2>{title}</h2><button aria-label="Fechar" type="button" onClick={onClose}><X size={22}/></button></div>{children}</section></div>;
+}
+export function MonthlyChart({values,label}:{values:number[];label:string}){const max=Math.max(...values,1);return <div className="forecast-chart" aria-label={label}>{values.map((v,i)=><div className="forecast-column" key={i}><div className="forecast-value">{formatMoney(v)}</div><div className="forecast-track"><i style={{height:`${v?Math.max(3,v/max*100):0}%`}}/></div><span>{FULL_MONTHS[i].slice(0,3)}</span></div>)}</div>;}
