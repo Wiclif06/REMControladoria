@@ -48,6 +48,19 @@ if(b.action==='updateUser'){
  });
  return 'error' in result?fail(result.error!,result.status):Response.json(result);
 }
+if(b.action==='deleteUser'){
+ if(m.role!=='admin')return fail('Somente a Controladoria pode excluir usuários.',403);
+ if(typeof b.username!=='string'||!b.username||b.username.length>60)return fail('Informe um usuário válido.');
+ const result=await db().transaction(async tx=>{
+  const user=await tx.prepare('SELECT username,role FROM app_users WHERE username=? FOR UPDATE').bind(b.username).first<any>();
+  if(!user)return {error:'Este usuário não existe mais.',status:404};
+  if(user.role!=='manager'||b.username===m.username)return {error:'O acesso da Controladoria não pode ser excluído.',status:403};
+  await tx.prepare('DELETE FROM sessions WHERE username=?').bind(b.username).run();
+  await tx.prepare("DELETE FROM app_users WHERE username=? AND role='manager'").bind(b.username).run();
+  return {ok:true};
+ });
+ return 'error' in result?fail(result.error!,result.status):Response.json(result);
+}
 if(b.action==='disableUser'){if(m.role!=='admin')return fail('Acesso restrito',403);if(typeof b.username!=='string'||b.username==='adriano.bastos')return fail('O administrador não pode ser desativado.');await db().batch([db().prepare("UPDATE app_users SET active=0 WHERE username=? AND role='manager'").bind(b.username),db().prepare('DELETE FROM sessions WHERE username=?').bind(b.username)]);return Response.json({ok:true});}
 if(b.action==='delete'){const old=await db().prepare('SELECT sector FROM employees WHERE id=?').bind(b.id).first<any>();if(!old || (m.role!=='admin'&&old.sector!==m.sector))return fail('Registro não disponível',403);await db().prepare('DELETE FROM employees WHERE id=?').bind(b.id).run();return Response.json({ok:true});}
 const e=b.employee;if(!e || !COMPANIES.includes(e.company)|| ![e.name,e.position,e.sector].every((x:any)=>typeof x==='string'&&x.trim().length>0&&x.length<=120)||!['CLT','PJ'].includes(e.contract)||![e.salary,e.meal,e.transport].every((x:any)=>Number.isSafeInteger(x)&&x>=0&&x<=100000000)||e.salary===0)return fail('Revise os dados e informe um salário maior que zero.');if(m.role!=='admin'&&e.sector!==m.sector)return fail('Você só pode cadastrar no seu setor.',403);if(e.id){const old=await db().prepare('SELECT sector FROM employees WHERE id=?').bind(e.id).first<any>();if(!old||(m.role!=='admin'&&old.sector!==m.sector))return fail('Registro não disponível',403);}
