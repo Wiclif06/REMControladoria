@@ -6,7 +6,8 @@ function connection(){
 }
 function translate(query:string){
  const ignore=/INSERT OR IGNORE/i.test(query);
- let sql=query.replace(/INSERT OR IGNORE/gi,'INSERT').replace(/\b(employees|app_users|areas|auth_attempts|sessions|payroll_rules|budget_plans|budget_history|area_budget_access)\b/g, 'rem_controladoria.$1');
+ // Keep JSON strings as text parameters before casting; postgres otherwise serializes them twice.
+ let sql=query.replace(/\?::jsonb\b/g,'?::text::jsonb').replace(/INSERT OR IGNORE/gi,'INSERT').replace(/\b(employees|app_users|areas|auth_attempts|sessions|payroll_rules|budget_plans|budget_history|area_budget_access)\b/g, 'rem_controladoria.$1');
  if(ignore)sql+=' ON CONFLICT DO NOTHING';
  let index=0;return sql.replace(/\?/g,()=>`$${++index}`);
 }
