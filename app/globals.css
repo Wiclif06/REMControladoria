@@ -80,3 +80,5 @@ body{background:#101317}::selection{background:#843445;color:#fff}button,input,s
 .budget-clear-empty{padding:24px 0;border-top:1px solid var(--line)}.budget-clear-empty h3{margin:0 0 10px;font-size:17px}.budget-clear-empty p{margin:0;line-height:1.6;color:#a7b5c9;max-width:650px}.consolidation-table .panel-heading>div:last-child h2{font-size:26px;margin:8px 0 14px}.consolidation-table summary{cursor:pointer;font-weight:600;padding:4px 0}.consolidation-table table th:not(:first-child),.consolidation-table table td:not(:first-child){white-space:nowrap}
 
 .workspace-brand{height:100px;min-height:100px;padding:0;justify-content:center;overflow:hidden;gap:0}.workspace-brand img{width:310px;max-width:none;height:auto;object-fit:contain;flex-shrink:0}
+
+.workspace-brand{height:112px;min-height:112px;display:flex;align-items:center;justify-content:center}.workspace-brand img{width:285px;transform:translateX(-1px)}.rem-loading-logo{display:block;width:380px;max-width:90vw;height:auto;margin:0 auto 18px}.rem-loading-content{display:flex;flex-direction:column;align-items:center;justify-content:center}
