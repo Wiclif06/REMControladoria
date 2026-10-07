@@ -78,3 +78,5 @@ body{background:#101317}::selection{background:#843445;color:#fff}button,input,s
 .controladoria-budget .budget-howto,.controladoria-budget .budget-assignments{display:none}.clean-budget-list{margin-top:0}.clean-budget-list tfoot td{padding:20px 18px;border-top:1px solid #475265;background:#202632;font-size:13px;font-weight:600}.controladoria-budget .budget-workbench{margin-top:20px}.controladoria-budget .budget-filters{margin-bottom:22px}
 
 .budget-clear-empty{padding:24px 0;border-top:1px solid var(--line)}.budget-clear-empty h3{margin:0 0 10px;font-size:17px}.budget-clear-empty p{margin:0;line-height:1.6;color:#a7b5c9;max-width:650px}.consolidation-table .panel-heading>div:last-child h2{font-size:26px;margin:8px 0 14px}.consolidation-table summary{cursor:pointer;font-weight:600;padding:4px 0}.consolidation-table table th:not(:first-child),.consolidation-table table td:not(:first-child){white-space:nowrap}
+
+.workspace-brand{height:100px;min-height:100px;padding:0;justify-content:center;overflow:hidden;gap:0}.workspace-brand img{width:310px;max-width:none;height:auto;object-fit:contain;flex-shrink:0}
