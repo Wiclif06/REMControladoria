@@ -1,3 +1,5 @@
+import {payrollForScope} from '../../payroll-budget-server';
+import {PAYROLL_STAGE_IDS,payrollAmounts,withPayroll} from '../../payroll-budget';
 import {allowedBudgetStages,limitAmounts} from '../../budget-access';
 import {db,getMember,validOrigin} from '../../auth';
 import {COMPANIES} from '../../payroll-rules';
@@ -11,9 +13,10 @@ export async function GET(req:Request){try{
  const params=new URL(req.url).searchParams;const requestedSector=params.get('sector');if(m.role!=='admin'&&requestedSector&&requestedSector!==m.sector)return fail('Este orçamento pertence a outro setor.',403);
  const year=Number(params.get('year')||2027);if(!validYear(year))return fail('Ano inválido.');
  const allowedStages=m.role==='admin'?BUDGET_STAGES:await allowedBudgetStages(m.sector);const allowedIds=new Set<string>(allowedStages.map(s=>s.id));
- const plans=(await (m.role==='admin'?db().prepare('SELECT * FROM budget_plans WHERE year=? ORDER BY company,sector').bind(year):db().prepare('SELECT * FROM budget_plans WHERE year=? AND sector=? ORDER BY company').bind(year,m.sector)).all()).results;
+ let plans=(await (m.role==='admin'?db().prepare('SELECT * FROM budget_plans WHERE year=? ORDER BY company,sector').bind(year):db().prepare('SELECT * FROM budget_plans WHERE year=? AND sector=? ORDER BY company').bind(year,m.sector)).all()).results;
+ const employees=await payrollForScope(m.role==='admin'?undefined:m.sector);if(employees.length)PAYROLL_STAGE_IDS.forEach(id=>allowedIds.add(id));plans=withPayroll(plans as unknown as BudgetPlan[],employees,year);
  const history=(await (m.role==='admin'?db().prepare('SELECT id,year,company,sector,actor,action,version,created_at FROM budget_history WHERE year=? ORDER BY created_at DESC LIMIT 100').bind(year):db().prepare('SELECT id,year,company,sector,actor,action,version,created_at FROM budget_history WHERE year=? AND sector=? ORDER BY created_at DESC LIMIT 100').bind(year,m.sector)).all()).results;
- return Response.json({plans:m.role==='admin'?plans:plans.map((p:any)=>({...p,amounts:limitAmounts(p.amounts,allowedIds)})),history,allowedStageIds:allowedStages.map(s=>s.id)},{headers:{'Cache-Control':'no-store'}});
+ return Response.json({plans:m.role==='admin'?plans:plans.map((p:any)=>({...p,amounts:limitAmounts(p.amounts,allowedIds)})),history,allowedStageIds:[...allowedIds],automaticStageIds:PAYROLL_STAGE_IDS},{headers:{'Cache-Control':'no-store'}});
 }catch(e){console.error(e);return fail('Não foi possível carregar o orçamento. Tente novamente.',503);}}
 export async function POST(req:Request){try{
  if(!validOrigin(req))return fail('Origem inválida.',403);const m=await getMember(req);if(!m)return fail('Faça login para continuar.',401);
@@ -26,10 +29,11 @@ export async function POST(req:Request){try{
  if(b.action==='approve'&&old?.status!=='submitted')return fail('Envie o orçamento para revisão antes de aprovar.');
  if(b.action==='return'&&(!old||!['submitted','approved'].includes(old.status)||!b.note.trim()))return fail('Informe o motivo da solicitação de ajustes.');
  if(!b.amounts||typeof b.amounts!=='object'||Array.isArray(b.amounts))return fail('Valores inválidos.');
- const allowedStages=m.role==='admin'?BUDGET_STAGES:await allowedBudgetStages(m.sector);const ids=new Set<string>(allowedStages.map(s=>s.id)),amounts:BudgetAmounts={};if(!ids.size)return fail('A Controladoria ainda não liberou orçamentos para este setor.',403);
- for(const [id,v] of Object.entries(b.amounts)){if(!ids.has(id))return fail('Seu setor não tem permissão para preencher esta despesa.',403);if(!Array.isArray(v)||v.length!==12||!v.every(x=>Number.isSafeInteger(x)&&x>=0&&x<=100000000))return fail('Informe valores entre zero e R$ 1.000.000,00 por etapa e mês.');if(v.some(x=>x>0))amounts[id]=v;}
- if(b.action==='submit'&&!Object.keys(amounts).length)return fail('Preencha ao menos uma despesa antes de enviar.');
- if(m.role!=='admin'&&old)Object.assign(amounts,Object.fromEntries(Object.entries(old.amounts).filter(([id])=>!ids.has(id))));
+ const allowedStages=m.role==='admin'?BUDGET_STAGES:await allowedBudgetStages(m.sector);const ids=new Set<string>(allowedStages.map(s=>s.id)),amounts:BudgetAmounts={};const employees=await payrollForScope(b.sector,b.company);if(employees.length)PAYROLL_STAGE_IDS.forEach(id=>ids.add(id));if(!ids.size)return fail('A Controladoria ainda não liberou orçamentos para este setor.',403);
+ for(const [id,v] of Object.entries(b.amounts)){if(PAYROLL_STAGE_IDS.includes(id))continue;if(!ids.has(id))return fail('Seu setor não tem permissão para preencher esta despesa.',403);if(!Array.isArray(v)||v.length!==12||!v.every(x=>Number.isSafeInteger(x)&&x>=0&&x<=100000000))return fail('Informe valores entre zero e R$ 1.000.000,00 por etapa e mês.');if(v.some(x=>x>0))amounts[id]=v;}
+ Object.assign(amounts,payrollAmounts(employees));
+ if(b.action==='submit'&&!Object.values(amounts).some(v=>v.some(x=>x>0)))return fail('Preencha ao menos uma despesa antes de enviar.');
+ if(m.role!=='admin'&&old)Object.assign(amounts,Object.fromEntries(Object.entries(old.amounts).filter(([id])=>!ids.has(id)&&!PAYROLL_STAGE_IDS.includes(id))));
  const status=b.action==='submit'?'submitted':b.action==='approve'?'approved':b.action==='return'?'changes':old?.status==='changes'?'changes':'draft';
  // Optimistic version and audit snapshot are committed in the same SQL statement.
  const result=await db().prepare(`WITH saved AS (
