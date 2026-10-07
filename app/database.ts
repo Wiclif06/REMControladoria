@@ -11,14 +11,15 @@ function translate(query:string){
  let index=0;return sql.replace(/\?/g,()=>`$${++index}`);
 }
 class Statement{
- constructor(readonly query:string,readonly values:any[]=[]){ }
- bind(...values:any[]){return new Statement(this.query,values);}
- async all(){return {results:Array.from(await connection().unsafe(translate(this.query),this.values))};}
+ constructor(readonly query:string,readonly values:any[]=[],readonly execute:(sql:string,values:any[])=>Promise<any>=(sql,values)=>connection().unsafe(sql,values)){ }
+ bind(...values:any[]){return new Statement(this.query,values,this.execute);}
+ async all(){return {results:Array.from(await this.execute(translate(this.query),this.values))};}
  async first<T=Record<string,unknown>>():Promise<T|null>{return (await this.all()).results[0] as T??null;}
- async run(){await connection().unsafe(translate(this.query),this.values);return {success:true};}
+ async run(){await this.execute(translate(this.query),this.values);return {success:true};}
 }
 export function database(){return {
  prepare:(query:string)=>new Statement(query),
+ transaction:async <T>(fn:(tx:{prepare:(query:string)=>Statement})=>Promise<T>)=>connection().begin(async transaction=>fn({prepare:(query:string)=>new Statement(query,[],(sql,values)=>transaction.unsafe(sql,values))})),
  batch:async (statements:Statement[])=>connection().begin(async transaction=>{
   const results=[];for(const statement of statements){await transaction.unsafe(translate(statement.query),statement.values);results.push({success:true});}return results;
  })
