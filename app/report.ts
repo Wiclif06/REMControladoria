@@ -2,13 +2,13 @@ import {costs,type CostInput} from './costs';
 import {cell,excelRow,worksheet,excelFile,column} from './excel';
 import {MONTHS} from './budget-catalog';
 export type RecordRow=CostInput & {name:string,company?:string,position:string,sector:string,contract:string,salary:number,meal:number,transport:number,admission?:string,notes?:string};
-export function makeReport(input:RecordRow[],areas:string[]){
+export function personnelSheet(input:RecordRow[],areas:string[],year=2027){
  const rows:string[]=[],merges=['A1:Q1','A2:Q2','A3:Q3'];let n=1;
  rows.push(excelRow(n,cell(n++,0,'REM CONSTRUTORA | CONTROLADORIA',24),30));
  rows.push(excelRow(n,cell(n++,0,'Gasto por Funcionário',8),27));
- rows.push(excelRow(n,cell(n++,0,'Projeção mensal com reajustes a partir do mês informado, encargos, provisões e benefícios.',3),25));
+ rows.push(excelRow(n,cell(n++,0,`Projeção de pessoal ${year}. Salários, benefícios, encargos, provisões e reajustes previstos.`,3),25));
  const heads=['EMPRESA / SETOR','FUNCIONÁRIO','CARGO','CONTRATO',...MONTHS.map(m=>m.toUpperCase()),'TOTAL ANUAL'];
- rows.push(excelRow(5,heads.map((h,i)=>cell(5,i,h,4)).join(''),28));n=6;const sectorTotals:number[]=[];
+ n=5;rows.push(excelRow(n,['EMPRESA','FUNCIONÁRIOS','','',...MONTHS.map(m=>m.toUpperCase()),'TOTAL ANUAL'].map((h,i)=>cell(n,i,h,4)).join(''),28));n++;const companyTotals:number[]=[];for(const company of [...new Set(input.map(e=>e.company||'—'))]){const people=input.filter(e=>(e.company||'—')===company),values=Array.from({length:12},(_,m)=>people.reduce((sum,e)=>sum+costs(e).monthlyValues[m],0));rows.push(excelRow(n,cell(n,0,company)+cell(n,1,people.length)+values.map((v,m)=>cell(n,m+4,v/100,30)).join('')+cell(n,16,values.reduce((a,b)=>a+b,0)/100,31,`SUM(E${n}:P${n})`),27));companyTotals.push(n++);}const companyGrand=Array.from({length:12},(_,m)=>input.reduce((sum,e)=>sum+costs(e).monthlyValues[m],0));rows.push(excelRow(n,cell(n,0,'TOTAL DAS EMPRESAS',24)+companyGrand.map((v,m)=>cell(n,m+4,v/100,30,companyTotals.length?companyTotals.map(r=>`${column(m+4)}${r}`).join('+'):'0')).join('')+cell(n,16,companyGrand.reduce((a,b)=>a+b,0)/100,31,`SUM(E${n}:P${n})`),30));n+=3;rows.push(excelRow(n,heads.map((h,i)=>cell(n,i,h,4)).join(''),28));n++;const sectorTotals:number[]=[];
  const groups=[...new Set(input.map(e=>JSON.stringify([e.company||'—',e.sector])))].sort();
  for(const key of groups){const [company,sector]=JSON.parse(key),people=input.filter(e=>(e.company||'—')===company&&e.sector===sector).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
  rows.push(excelRow(n,cell(n,0,`${company} • ${sector}`,24),26));merges.push(`A${n}:Q${n}`);n++;const start=n;
@@ -26,5 +26,7 @@ export function makeReport(input:RecordRow[],areas:string[]){
  for(const e of input.filter(e=>(e.adjustmentRate||0)>0)){const k=costs(e);rows.push(excelRow(n,cell(n,0,e.company||'—')+cell(n,1,e.sector)+cell(n,2,e.name)+cell(n,3,e.contract)+cell(n,4,e.salary/100,30)+cell(n,5,(e.adjustmentRate||0)/100)+cell(n,6,MONTHS[(e.adjustmentMonth||1)-1])+cell(n,7,k.adjustedSalary/100,30)+cell(n,8,k.adjustmentImpact/100,30)));n++;}
  rows.push(excelRow(n,cell(n,0,'Provisões projetadas conforme o salário de cada mês. Benefícios não recebem o reajuste salarial.',3)));merges.push(`A${n}:Q${n}`);
  rows.push(excelRow(n+2,cell(n+2,0,'Emitido em '+new Date().toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}))));
- return excelFile([{name:'Gasto por Funcionário',xml:worksheet(rows,[27,32,29,12,...Array(13).fill(17)],merges)}]);
+ return {name:'Gasto por Funcionário',xml:worksheet(rows,[27,32,29,12,...Array(13).fill(17)],merges)};
 }
+
+export function makeReport(input:RecordRow[],areas:string[]){return excelFile([personnelSheet(input,areas)]);}
