@@ -154,6 +154,13 @@ export const BUDGET_STAGES = [
     "group": "Benefícios"
   },
   {
+    "id": "174",
+    "code": "AUTO-BENEFICIOS",
+    "name": "OUTROS BENEFÍCIOS DO CADASTRO",
+    "category": "DESPESAS COM PESSOAL",
+    "group": "Benefícios"
+  },
+  {
     "id": "30",
     "code": "2.005.01.0027",
     "name": "PLANO ODONTOLÓGICO (ADM)",
