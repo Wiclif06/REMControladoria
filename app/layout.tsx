@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "REM Constroladoria - APP",
+  title: "REM Controladoria - APP",
   description: "Gestão de pessoas e custos mensais por setor da REM Construtora.",
   other: {
     "codex-preview": "development",

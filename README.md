@@ -1,4 +1,4 @@
-# REM Constroladoria - APP
+# REM Controladoria - APP
 
 Portal de orçamento de pessoal para ALPAN, REM Construtora e REM Vendas.
 
