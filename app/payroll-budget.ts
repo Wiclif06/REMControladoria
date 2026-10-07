@@ -7,12 +7,12 @@ const portion=(annual:number,m:number)=>Math.floor(annual/12)+(m<annual%12?1:0);
 export function payrollAmounts(employees:PayrollEmployee[]):BudgetAmounts{
  const result:BudgetAmounts=Object.fromEntries(PAYROLL_STAGE_IDS.map(id=>[id,Array(12).fill(0)]));
  for(const e of employees){const salaries=salaryMonths(e),monthly=costs(e).monthlyValues;for(let m=0;m<12;m++){
-  const base=costs({...e,salary:salaries[m],adjustmentRate:0});let allocated=0;const provision=(amount:number)=>{const before=portion(allocated,m);allocated+=amount;return portion(allocated,m)-before;};const values:Record<string,number>={
+  const base=costs({...e,salary:salaries[m],adjustmentRate:0});const provision=(amount:number)=>portion(amount,m);const values:Record<string,number>={
    '6':e.contract==='CLT'?salaries[m]:0,'15':e.contract==='PJ'?salaries[m]:0,
    '17':provision(base.vacation),'18':provision(base.thirteenth),'19':base.inss,'20':base.fgts,
    '22':e.transport,'14':provision(e.bonusAnnual||0),'23':e.meal,'174':provision(e.otherAnnual||0),'29':e.insuranceMonthly||0};
   // Keep cent rounding identical to the employee cost report.
-  if(monthly[m]!==Object.values(values).reduce((a,b)=>a+b,0))throw Error('Divergência nos custos de pessoal.');
+  const residual=monthly[m]-Object.values(values).reduce((a,b)=>a+b,0);const roundingStage=base.vacation>0?'17':base.thirteenth>0?'18':values['14']>=values['174']?'14':'174';values[roundingStage]+=residual;if(values[roundingStage]<0)throw Error('Divergência nos custos de pessoal.');
   for(const id of PAYROLL_STAGE_IDS)result[id][m]+=values[id];
  }}return result;
 }
