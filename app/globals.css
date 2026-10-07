@@ -82,3 +82,12 @@ body{background:#101317}::selection{background:#843445;color:#fff}button,input,s
 .workspace-brand{height:100px;min-height:100px;padding:0;justify-content:center;overflow:hidden;gap:0}.workspace-brand img{width:310px;max-width:none;height:auto;object-fit:contain;flex-shrink:0}
 
 .workspace-brand{height:112px;min-height:112px;display:flex;align-items:center;justify-content:center}.workspace-brand img{width:285px;transform:translateX(-1px)}.rem-loading-logo{display:block;width:380px;max-width:90vw;height:auto;margin:0 auto 18px}.rem-loading-content{display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+/* Compact centered brand loading. */
+.rem-loading{border-top:0;padding:32px 24px;background:#10151b}
+.rem-loading-content{width:min(100%,420px);gap:0}
+.rem-loading-logo{width:100%;max-width:420px;height:auto;margin:0;mix-blend-mode:screen;object-fit:contain}
+.rem-loading-line{width:140px;height:2px;margin-top:6px;background:#29313a}
+.rem-loading-content p{font-size:12px;color:#9ba8b8;margin-top:14px}
+.rem-loading-footer{display:none}
+@media(max-width:600px){.rem-loading-content{width:min(100%,340px)}}
