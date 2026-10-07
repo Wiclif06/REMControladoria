@@ -4,7 +4,7 @@ import {MONTHS} from './budget-catalog';
 export type RecordRow=CostInput & {name:string,company?:string,position:string,sector:string,contract:string,salary:number,meal:number,transport:number,admission?:string,notes?:string};
 export function personnelSheet(input:RecordRow[],areas:string[],year=2027){
  const rows:string[]=[],merges=['A1:Q1','A2:Q2','A3:Q3'];let n=1;
- rows.push(excelRow(n,cell(n++,0,'REM CONSTRUTORA | CONTROLADORIA',24),30));
+ rows.push(excelRow(n,cell(n++,0,'REM CONTROLADORIA',24),30));
  rows.push(excelRow(n,cell(n++,0,'Gasto por Funcionário',8),27));
  rows.push(excelRow(n,cell(n++,0,`Projeção de pessoal ${year}. Salários, benefícios, encargos, provisões e reajustes previstos.`,3),25));
  const heads=['EMPRESA / SETOR','FUNCIONÁRIO','CARGO','CONTRATO',...MONTHS.map(m=>m.toUpperCase()),'TOTAL ANUAL'];
