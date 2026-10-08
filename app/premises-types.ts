@@ -11,13 +11,23 @@ export const PREMISE_QUESTIONS=[
  {id:'consulting',question:'Quais assessorias e consultorias serão necessárias?',hint:'Descreva os serviços e o período de contratação.',unit:'Serviços'},
  {id:'administrative',question:'Quais despesas administrativas estão previstas?',hint:'Descreva as despesas, a frequência e os valores estimados, se souber.',unit:'Itens'}
 ] as const;
-export type PremiseAnswer={text:string;quantity:number|null};
+export type PremiseItem={text:string;quantity:number|null};
+export type PremiseAnswer=PremiseItem & {items?:PremiseItem[]};
 export type PremiseAnswers=Record<string,PremiseAnswer>;
 export type PremisePlan={year:number;company:string;sector:string;answers:PremiseAnswers;version:number;updated_by:string;updated_at:string};
+export const answerItems=(answer?:PremiseAnswer):PremiseItem[]=>answer?.items?.length?answer.items:[{text:answer?.text||'',quantity:answer?.quantity??null}];
+export const hasAnswer=(answer?:PremiseAnswer)=>answerItems(answer).some(item=>item.text.trim()||item.quantity!==null);
+export const makeAnswer=(items:PremiseItem[]):PremiseAnswer=>({...items[0],items});
 export const emptyAnswers=():PremiseAnswers=>Object.fromEntries(PREMISE_QUESTIONS.map(q=>[q.id,{text:'',quantity:null}]));
 export function validateAnswers(input:unknown):PremiseAnswers|null{
  if(!input||typeof input!=='object'||Array.isArray(input))return null;
  const source=input as Record<string,any>,allowed=new Set<string>(PREMISE_QUESTIONS.map(q=>q.id));
  if(Object.keys(source).some(id=>!allowed.has(id)))return null;
- const result=emptyAnswers();for(const q of PREMISE_QUESTIONS){const a=source[q.id];if(a===undefined)continue;if(!a||typeof a.text!=='string'||a.text.length>4000||(a.quantity!==null&&(!Number.isSafeInteger(a.quantity)||a.quantity<0||a.quantity>100000)))return null;result[q.id]={text:a.text.trim(),quantity:a.quantity};}return result;
+ const result=emptyAnswers();let totalText=0;
+ for(const q of PREMISE_QUESTIONS){const a=source[q.id];if(a===undefined)continue;if(!a||typeof a!=='object')return null;
+ const items=a.items===undefined?[a]:a.items;
+ if(!Array.isArray(items)||items.length<1||items.length>50)return null;
+ const clean:PremiseItem[]=[];for(const item of items){if(!item||typeof item.text!=='string'||item.text.length>4000||(item.quantity!==null&&(!Number.isSafeInteger(item.quantity)||item.quantity<0||item.quantity>100000)))return null;totalText+=item.text.length;if(totalText>100000)return null;clean.push({text:item.text.trim(),quantity:item.quantity});}
+ result[q.id]=makeAnswer(clean);
+ }return result;
 }
