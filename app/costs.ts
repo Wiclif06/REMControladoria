@@ -3,7 +3,7 @@ export type CostInput = {
  chargeRate?:number; inssRate?:number; fgtsRate?:number;
  vacationFactor?:number; thirteenthFactor?:number; bonusAnnual?:number;
  insuranceMonthly?:number; otherAnnual?:number; adjustmentRate?:number; adjustmentMonth?:number;
- healthMonthly?:number; healthEmployeeMonthly?:number;
+ healthEnabled?:boolean; insuranceEnabled?:boolean; healthMonthly?:number; healthEmployeeMonthly?:number;
  healthCopayMonthly?:number; healthCopayEmployeeMonthly?:number; taskMonthly?:number;
 };
 export const isEngineering=(sector:string)=>sector.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()==='engenharia';

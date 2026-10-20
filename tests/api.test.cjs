@@ -1,5 +1,22 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fixture=require('./api-fixture.cjs');
 const employee={name:'Teste',constructionSite:'Bom Retiro',company:'REM Construtora',position:'Engenheiro',sector:'Engenharia',contract:'CLT',salary:500000,meal:100000,transport:40000,healthMonthly:80000,healthEmployeeMonthly:20000,healthCopayMonthly:15000,healthCopayEmployeeMonthly:10000,taskMonthly:50000};
+test('benefit selections save without prices, survive edits, and can be unchecked',async()=>{
+ const f=fixture('manager'),input={...employee,healthEnabled:true,insuranceEnabled:true,healthMonthly:0,healthEmployeeMonthly:0,healthCopayMonthly:0,healthCopayEmployeeMonthly:0};
+ const saved=await f.api.POST(f.request({employee:input}));assert.equal(saved.status,200);const id=(await saved.json()).id;
+ let e=(await(await f.api.GET()).json()).employees[0];assert.equal(e.healthEnabled,true);assert.equal(e.insuranceEnabled,true);assert.equal(e.healthMonthly,0);assert.equal(e.insuranceMonthly,0);
+ assert.equal((await f.api.POST(f.request({employee:{...input,id,name:'Novo nome',healthEnabled:undefined,insuranceEnabled:undefined}}))).status,200);
+ e=(await(await f.api.GET()).json()).employees[0];assert.equal(e.healthEnabled,true);assert.equal(e.insuranceEnabled,true);
+ assert.equal((await f.api.POST(f.request({employee:{...input,id,healthEnabled:false,insuranceEnabled:false}}))).status,200);
+ e=(await(await f.api.GET()).json()).employees[0];assert.equal(e.healthEnabled,false);assert.equal(e.insuranceEnabled,false);
+});
+test('existing costs remain when selected; deselecting clears costs and invalid flags are rejected',async()=>{
+ const f=fixture('manager');const saved=await f.api.POST(f.request({employee:{...employee,insuranceMonthly:5000}}));const id=(await saved.json()).id;
+ assert.equal((await f.api.POST(f.request({employee:{...employee,id,healthEnabled:true,insuranceEnabled:true}}))).status,200);
+ assert.equal(f.state.employees[0].health_monthly,80000);assert.equal(f.state.employees[0].insurance_monthly,5000);
+ for(const flag of [null,1,'true'])assert.equal((await f.api.POST(f.request({employee:{...employee,id,healthEnabled:flag}}))).status,400);
+ assert.equal((await f.api.POST(f.request({employee:{...employee,id,healthEnabled:false,insuranceEnabled:false}}))).status,200);
+ for(const field of ['health_monthly','health_employee_monthly','health_copay_monthly','health_copay_employee_monthly','insurance_monthly'])assert.equal(f.state.employees[0][field],0);
+});
 test('both engineering managers can register and move employees among the five works',async()=>{
  for(const username of ['diego.martins','renato.filho']){
   const f=fixture('manager');f.state.member.username=username;
