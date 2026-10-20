@@ -1,0 +1,66 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {chromium}=require('playwright'),fixture=require('./api-fixture.cjs');
+(async()=>{
+ const browser=await chromium.launch({headless:true,channel:'msedge'});
+ try{
+ const page=await browser.newPage({viewport:{width:1440,height:1100}}),f=fixture(),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));
+ // Fixture API is the actual route implementation; only its database/session adapter is in memory.
+ await page.route('**/api/**',async route=>{
+  const r=route.request(),url=new URL(r.url());let handler;
+  if(url.pathname==='/api/data')handler=f.api;
+  else if(['/api/budget','/api/export','/api/budget/export'].includes(url.pathname))handler=f.load('app'+url.pathname+'/route.ts');
+  else return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({plans:[],history:[]})});
+  const request=new Request(r.url(),{method:r.method(),headers:{...r.headers(),origin:url.origin},...(r.method()==='POST'?{body:r.postData()}: {})});
+  const response=await handler[r.method()](request);await route.fulfill({status:response.status,headers:Object.fromEntries(response.headers),body:Buffer.from(await response.arrayBuffer())});
+ });
+ await page.goto(process.env.TEST_BASE_URL||'http://localhost:3100');
+ await page.getByRole('button',{name:'Registrar funcionário',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await dialog.getByLabel('Nome completo').fill('Pessoa de teste');
+ await dialog.getByRole('combobox',{name:/Empresa/}).selectOption('REM Construtora');
+ await dialog.getByRole('combobox',{name:/Setor/}).selectOption('Engenharia');
+ await dialog.getByLabel('Cargo',{exact:true}).fill('Engenheiro');
+ await dialog.getByRole('spinbutton',{name:'Salário bruto mensal',exact:true}).fill('5000');
+ await dialog.getByRole('spinbutton',{name:'Tarefa mensal — Engenharia',exact:true}).fill('500');
+ assert.equal(await dialog.getByText('Férias previstas',{exact:true}).count(),0);
+ await dialog.getByRole('button',{name:'Continuar para benefícios'}).click();
+ await dialog.getByRole('checkbox',{name:'Vale-refeição / alimentação'}).check();
+ await dialog.getByRole('spinbutton',{name:'VR / VA mensal',exact:true}).fill('1000');
+ await dialog.getByRole('checkbox',{name:'Vale-transporte'}).check();
+ await dialog.getByRole('spinbutton',{name:'VT mensal',exact:true}).fill('400');
+ await dialog.getByRole('spinbutton',{name:'Mensalidade total do plano',exact:true}).fill('800');
+ await dialog.getByRole('spinbutton',{name:'Participação do funcionário na mensalidade',exact:true}).fill('200');
+ await dialog.getByRole('spinbutton',{name:'Coparticipação total prevista por mês',exact:true}).fill('150');
+ await dialog.getByRole('spinbutton',{name:'Coparticipação descontada do funcionário',exact:true}).fill('100');
+ fs.mkdirSync(path.resolve(__dirname,'../../qa'),{recursive:true});
+ await page.screenshot({path:path.resolve(__dirname,'../../qa/beneficios.png'),fullPage:true});
+ await dialog.getByRole('button',{name:'Conferir cadastro'}).click();
+ await dialog.getByRole('button',{name:'Salvar funcionário',exact:true}).click();
+ await page.getByRole('button',{name:'Editar Pessoa de teste',exact:true}).click();
+ assert.equal(await dialog.getByRole('spinbutton',{name:'Tarefa mensal — Engenharia',exact:true}).inputValue(),'500');
+ await dialog.getByRole('button',{name:'Continuar para benefícios'}).click();
+ assert.equal(await dialog.getByRole('spinbutton',{name:'Mensalidade total do plano',exact:true}).inputValue(),'800');
+ await dialog.getByRole('button',{name:'Fechar cadastro',exact:true}).click();
+ await page.getByRole('button',{name:'Parâmetros',exact:true}).click();
+ assert.equal(await page.getByLabel('Encargos CLT totais, incluindo FGTS (%)').inputValue(),'26.8');
+ assert.equal(await page.getByLabel('Adicional de férias sobre o salário (%)').count(),2);
+ await page.getByLabel('Encargos CLT totais, incluindo FGTS (%)').fill('30');
+ await page.getByRole('button',{name:'Aplicar parâmetros CLT',exact:true}).click();
+ await page.getByText('Alterações salvas',{exact:true}).waitFor();assert.equal(f.state.employees[0].charge_rate,3000);
+ await page.screenshot({path:path.resolve(__dirname,'../../qa/parametros.png'),fullPage:true});
+ f.state.member.role='manager';await page.reload();
+ await page.getByRole('button',{name:'Funcionários',exact:true}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Parâmetros',exact:true}).count(),0);
+ assert.equal(await page.getByRole('button',{name:'Orçamento',exact:true}).count(),0);
+ await page.getByRole('button',{name:'Registrar funcionário',exact:true}).click();
+ assert(await dialog.getByRole('combobox',{name:/Setor/}).isDisabled());
+ assert.equal(await dialog.getByRole('spinbutton',{name:'Tarefa mensal — Engenharia',exact:true}).count(),1);
+ await dialog.getByRole('button',{name:'Fechar cadastro',exact:true}).click();
+ f.state.member.sector='Financeiro';await page.reload();
+ await page.getByRole('button',{name:'Registrar funcionário',exact:true}).click();
+ assert.equal(await dialog.getByRole('spinbutton',{name:'Tarefa mensal — Engenharia',exact:true}).count(),0);
+ assert.deepEqual(errors,[]);console.log('PASS: browser create/save/reopen, health values, task scope, admin parameters, manager restrictions, no page errors');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
+

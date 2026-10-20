@@ -1,20 +1,16 @@
-import {costs,salaryMonths,type CostInput} from './costs';
+import {costs,type CostInput} from './costs';
 import type {BudgetAmounts,BudgetPlan} from './budget-types';
-export const PAYROLL_STAGE_IDS=['6','15','17','18','19','20','22','23','14','29','174'];
+export const PAYROLL_STAGE_IDS=['6','15','17','18','19','20','22','23','14','29','174','25','175'];
 export type PayrollEmployee=CostInput & {company:string;sector:string};
-export function payrollEmployee(row:any):PayrollEmployee{return {...row,adjustmentRate:row.adjustment_rate??row.adjustmentRate,adjustmentMonth:row.adjustment_month??row.adjustmentMonth,inssRate:row.inss_rate??row.inssRate,fgtsRate:row.fgts_rate??row.fgtsRate,vacationFactor:row.vacation_factor??row.vacationFactor,thirteenthFactor:row.thirteenth_factor??row.thirteenthFactor,bonusAnnual:row.bonus_annual??row.bonusAnnual,insuranceMonthly:row.insurance_monthly??row.insuranceMonthly,otherAnnual:row.other_annual??row.otherAnnual};}
-const portion=(annual:number,m:number)=>Math.floor(annual/12)+(m<annual%12?1:0);
+export function payrollEmployee(row:any):PayrollEmployee{return {...row,chargeRate:row.charge_rate??row.chargeRate,healthMonthly:row.health_monthly??row.healthMonthly,healthEmployeeMonthly:row.health_employee_monthly??row.healthEmployeeMonthly,healthCopayMonthly:row.health_copay_monthly??row.healthCopayMonthly,healthCopayEmployeeMonthly:row.health_copay_employee_monthly??row.healthCopayEmployeeMonthly,taskMonthly:row.task_monthly??row.taskMonthly,adjustmentRate:row.adjustment_rate??row.adjustmentRate,adjustmentMonth:row.adjustment_month??row.adjustmentMonth,inssRate:row.inss_rate??row.inssRate,fgtsRate:row.fgts_rate??row.fgtsRate,vacationFactor:row.vacation_factor??row.vacationFactor,thirteenthFactor:row.thirteenth_factor??row.thirteenthFactor,bonusAnnual:row.bonus_annual??row.bonusAnnual,insuranceMonthly:row.insurance_monthly??row.insuranceMonthly,otherAnnual:row.other_annual??row.otherAnnual};}
 export function payrollAmounts(employees:PayrollEmployee[]):BudgetAmounts{
  const result:BudgetAmounts=Object.fromEntries(PAYROLL_STAGE_IDS.map(id=>[id,Array(12).fill(0)]));
- for(const e of employees){const salaries=salaryMonths(e),monthly=costs(e).monthlyValues;for(let m=0;m<12;m++){
-  const base=costs({...e,salary:salaries[m],adjustmentRate:0});const provision=(amount:number)=>portion(amount,m);const values:Record<string,number>={
-   '6':e.contract==='CLT'?salaries[m]:0,'15':e.contract==='PJ'?salaries[m]:0,
-   '17':provision(base.vacation),'18':provision(base.thirteenth),'19':base.inss,'20':base.fgts,
-   '22':e.transport,'14':provision(e.bonusAnnual||0),'23':e.meal,'174':provision(e.otherAnnual||0),'29':e.insuranceMonthly||0};
-  // Keep cent rounding identical to the employee cost report.
-  const residual=monthly[m]-Object.values(values).reduce((a,b)=>a+b,0);const roundingStage=base.vacation>0?'17':base.thirteenth>0?'18':values['14']>=values['174']?'14':'174';values[roundingStage]+=residual;if(values[roundingStage]<0)throw Error('Divergência nos custos de pessoal.');
+ for(const e of employees)costs(e).monthlyBreakdown.forEach((c,m)=>{
+  const values:Record<string,number>={'6':e.contract==='CLT'?c.salary:0,'15':e.contract==='PJ'?c.salary:0,
+   '17':c.vacation,'18':c.thirteenth,'19':c.inss,'20':c.fgts,'22':c.transportNet,'23':c.mealNet,
+   '14':c.bonus,'174':c.other,'29':c.insurance,'25':c.healthNet,'175':c.task};
   for(const id of PAYROLL_STAGE_IDS)result[id][m]+=values[id];
- }}return result;
+ });return result;
 }
 export function withPayroll(plans:BudgetPlan[],employees:PayrollEmployee[],year:number):BudgetPlan[]{
  const byScope=new Map(plans.map(p=>[JSON.stringify([p.company,p.sector]),p]));

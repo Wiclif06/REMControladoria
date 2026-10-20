@@ -1,4 +1,5 @@
 export const BUDGET_STAGES = [
+  {id:'175',code:'AUTO-TAREFA',name:'TAREFA — ADICIONAL ENGENHARIA',category:'DESPESAS COM PESSOAL',group:'Despesas com salários'},
   {
     "id": "6",
     "code": "2.005.01.0001",
@@ -86,7 +87,7 @@ export const BUDGET_STAGES = [
   {
     "id": "19",
     "code": "2.005.01.0011",
-    "name": "ENCARGOS SOCIAIS INSS (ADM)",
+    "name": "ENCARGOS CLT EXCETO FGTS (ADM)",
     "category": "DESPESAS COM PESSOAL",
     "group": "Encargos Sociais"
   },
