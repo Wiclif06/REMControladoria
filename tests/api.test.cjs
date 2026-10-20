@@ -1,5 +1,37 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fixture=require('./api-fixture.cjs');
-const employee={name:'Teste',company:'REM Construtora',position:'Engenheiro',sector:'Engenharia',contract:'CLT',salary:500000,meal:100000,transport:40000,healthMonthly:80000,healthEmployeeMonthly:20000,healthCopayMonthly:15000,healthCopayEmployeeMonthly:10000,taskMonthly:50000};
+const employee={name:'Teste',constructionSite:'Bom Retiro',company:'REM Construtora',position:'Engenheiro',sector:'Engenharia',contract:'CLT',salary:500000,meal:100000,transport:40000,healthMonthly:80000,healthEmployeeMonthly:20000,healthCopayMonthly:15000,healthCopayEmployeeMonthly:10000,taskMonthly:50000};
+test('both engineering managers can register and move employees among the five works',async()=>{
+ for(const username of ['diego.martins','renato.filho']){
+  const f=fixture('manager');f.state.member.username=username;
+  assert.deepEqual((await(await f.api.GET()).json()).constructionSites,f.state.sites);
+  for(const constructionSite of f.state.sites)assert.equal((await f.api.POST(f.request({employee:{...employee,constructionSite}}))).status,200);
+  const data=await(await f.api.GET()).json();assert.deepEqual(data.employees.map(e=>e.constructionSite),f.state.sites);
+  const id=data.employees[0].id;
+  assert.equal((await f.api.POST(f.request({employee:{...employee,id,constructionSite:'Altitude Jardins'}}))).status,200);
+  assert.equal(f.state.employees[0].construction_site,'Altitude Jardins');
+ }
+});
+test('engineering requires a registered work and other sectors cannot submit a work',async()=>{
+ for(const constructionSite of [undefined,null,'','Obra inexistente']){
+  const f=fixture('manager');assert.equal((await f.api.POST(f.request({employee:{...employee,constructionSite}}))).status,400);assert.equal(f.state.writes.length,0);
+ }
+ const f=fixture('manager','Financeiro');assert.deepEqual((await(await f.api.GET()).json()).constructionSites,[]);
+ assert.equal((await f.api.POST(f.request({employee:{...employee,sector:'Financeiro',taskMonthly:0}}))).status,400);
+ assert.equal((await f.api.POST(f.request({employee:{...employee,sector:'Financeiro',taskMonthly:0,constructionSite:null}}))).status,200);
+});
+test('work filter exports only its personnel while sector budget still sums all works once',async()=>{
+ const f=fixture();
+ for(const [name,constructionSite] of [['Pessoa Bom','Bom Retiro'],['Pessoa Altitude','Altitude Jardins']])assert.equal((await f.api.POST(f.request({employee:{...employee,name,constructionSite}}))).status,200);
+ const budget=await(await f.load('app/api/budget/route.ts').GET(new Request('http://localhost:3100/api/budget?year=2027'))).json();
+ assert.equal(budget.plans[0].amounts['25'][0],130000);assert.equal(budget.plans[0].amounts['175'][0],100000);
+ const api=f.load('app/api/export/route.ts'),{unzipSync,strFromU8}=require('fflate');
+ const res=await api.GET(new Request('http://localhost:3100/api/export?constructionSite=Bom%20Retiro'));
+ assert.equal(res.status,200);const files=unzipSync(new Uint8Array(await res.arrayBuffer())),xml=strFromU8(files['xl/worksheets/sheet1.xml']);
+ assert(xml.includes('Pessoa Bom'));assert(!xml.includes('Pessoa Altitude'));assert(!files['xl/worksheets/sheet2.xml']);
+ assert.equal((await api.GET(new Request('http://localhost:3100/api/export?constructionSite=Unknown'))).status,400);
+ const full=unzipSync(new Uint8Array(await(await api.GET(new Request('http://localhost:3100/api/export'))).arrayBuffer()));
+ const personnel=strFromU8(full['xl/worksheets/sheet2.xml']);assert(personnel.includes('Obra: Bom Retiro'));assert(personnel.includes('Obra: Altitude Jardins'));
+});
 test('save/reopen keeps health and task, server overrides submitted charges, old vacation dates remain untouched',async()=>{
  const f=fixture('manager');let res=await f.api.POST(f.request({employee:{...employee,chargeRate:0,inssRate:0}}));assert.equal(res.status,200);
  const id=(await res.json()).id;assert.equal(f.state.employees[0].charge_rate,2680);f.state.employees[0].vacation_start='2027-01-01';
