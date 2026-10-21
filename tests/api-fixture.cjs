@@ -1,15 +1,17 @@
 const path=require('node:path'),assert=require('node:assert/strict');
 module.exports=function fixture(role='admin',sector='Engenharia'){
- const state={member:{username:'test.user',display_name:'Usuário de teste',role,sector},sites:['Bom Retiro','Pç. Mário Fontana','Altitude Jardins','Doppio Jundiai','Caiubi Maranello'],employees:[],writes:[],rules:[{company:'CLT',charge_rate:2680,inss_rate:1880,fgts_rate:800,vacation_factor:3333,thirteenth_factor:10000,adjustment_rate:500,adjustment_month:5,bonus_annual:0},{company:'PJ',charge_rate:0,inss_rate:0,fgts_rate:0,vacation_factor:0,thirteenth_factor:0,adjustment_rate:0,adjustment_month:1,bonus_annual:0}]};
+ const state={member:{username:'test.user',display_name:'Usuário de teste',role,sector},sites:['Bom Retiro','Pç. Mário Fontana','Altitude Jardins','Doppio Jundiai','Caiubi Maranello'],siteGrants:{},employees:[],writes:[],rules:[{company:'CLT',charge_rate:2680,inss_rate:1880,fgts_rate:800,vacation_factor:3333,thirteenth_factor:10000,adjustment_rate:500,adjustment_month:5,bonus_annual:0},{company:'PJ',charge_rate:0,inss_rate:0,fgts_rate:0,vacation_factor:0,thirteenth_factor:0,adjustment_rate:0,adjustment_month:1,bonus_annual:0}]};
  const database={prepare(query){let values=[];const stmt={bind(...v){values=v;return stmt;},async all(){
+  if(query.startsWith('SELECT construction_site FROM employee_site_access'))return {results:(state.siteGrants[values[0]]||[]).map(construction_site=>({construction_site}))};
   if(query.startsWith('SELECT * FROM payroll_rules'))return {results:structuredClone(state.rules)};
   if(query.startsWith('SELECT name FROM construction_sites'))return {results:state.sites.map(name=>({name}))};
+  if(query.startsWith('SELECT * FROM employees')&&query.includes('employee_site_access'))return {results:structuredClone(state.employees.filter(e=>e.sector===values[0]||(e.sector==='Engenharia'&&(state.siteGrants[values[1]]||[]).includes(e.construction_site))))};
   if(query.startsWith('SELECT * FROM employees')){const filters=[...query.matchAll(/(sector|company|construction_site)=\?/g)].map(m=>m[1]);return {results:structuredClone(state.employees.filter(e=>filters.every((field,i)=>e[field]===values[i])))};}
-  if(query.includes('FROM areas a'))return {results:['Engenharia','Financeiro'].filter(s=>state.member.role==='admin'||s===state.member.sector).map(name=>({name,budget_groups:[]}))};
+  if(query.includes('FROM areas a'))return {results:['Engenharia','Financeiro','Incorporação'].filter(s=>state.member.role==='admin'||s===state.member.sector).map(name=>({name,budget_groups:[]}))};
   return {results:[]};
  },async first(){
   if(query.startsWith('SELECT name FROM construction_sites'))return state.sites.includes(values[0])?{name:values[0]}:null;
-  if(query.startsWith('SELECT name FROM areas'))return ['Engenharia','Financeiro'].includes(values[0])?{name:values[0]}:null;
+  if(query.startsWith('SELECT name FROM areas'))return ['Engenharia','Financeiro','Incorporação'].includes(values[0])?{name:values[0]}:null;
   if(query.startsWith('SELECT * FROM employees')||query.startsWith('SELECT sector FROM employees'))return state.employees.find(e=>e.id===values[0])||null;
   return null;
  },async run(){

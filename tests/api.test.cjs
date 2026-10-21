@@ -1,5 +1,22 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fixture=require('./api-fixture.cjs');
 const employee={name:'Teste',constructionSite:'Bom Retiro',company:'REM Construtora',position:'Engenheiro',sector:'Engenharia',contract:'CLT',salary:500000,meal:100000,transport:40000,healthMonthly:80000,healthEmployeeMonthly:20000,healthCopayMonthly:15000,healthCopayEmployeeMonthly:10000,taskMonthly:50000};
+test('Fernanda can read, create and edit shared Maintenance without access to other Engineering works',async()=>{
+ const f=fixture();f.state.sites.push('Manutenção');f.state.siteGrants['fernanda.vieira']=['Manutenção'];
+ const ids=[];
+ for(const e of [{...employee,name:'Obra privada'},{...employee,name:'Equipe Manutenção',constructionSite:'Manutenção'},{...employee,name:'Equipe Incorporação',sector:'Incorporação',constructionSite:null,taskMonthly:0}])ids.push((await(await f.api.POST(f.request({employee:e}))).json()).id);
+ f.state.member={username:'fernanda.vieira',role:'manager',sector:'Incorporação'};
+ let data=await(await f.api.GET()).json();assert.deepEqual(data.employees.map(e=>e.name),['Equipe Manutenção','Equipe Incorporação']);assert.deepEqual(data.constructionSites,['Manutenção']);assert.deepEqual(data.areas.map(a=>a.name),['Incorporação']);
+ const shared={...employee,constructionSite:'Manutenção'};
+ assert.equal((await f.api.POST(f.request({employee:{...shared,name:'Novo funcionário'}}))).status,200);
+ assert.equal((await f.api.POST(f.request({employee:{...shared,id:ids[1],salary:600000}}))).status,200);assert.equal(f.state.employees.find(e=>e.id===ids[1]).salary,600000);
+ for(const e of [employee,{...shared,id:ids[0]},{...shared,id:ids[1],sector:'Incorporação',constructionSite:null,taskMonthly:0},{...shared,id:ids[1],constructionSite:'Bom Retiro'}])assert.equal((await f.api.POST(f.request({employee:e}))).status,403);
+ assert.equal((await f.api.POST(f.request({action:'delete',id:ids[1]}))).status,403);
+ assert.equal((await f.api.POST(f.request({action:'saveRules',rule:{}}))).status,403);
+ assert.equal((await f.load('app/api/budget/route.ts').GET(new Request('http://localhost:3100/api/budget'))).status,403);
+ f.state.member.role='admin';data=await(await f.api.GET()).json();assert.equal(data.employees.length,4);assert.equal(new Set(data.employees.map(e=>e.id)).size,4);
+ f.state.member.role='manager';f.state.member.username='outra.pessoa';data=await(await f.api.GET()).json();assert.deepEqual(data.employees.map(e=>e.name),['Equipe Incorporação']);assert.deepEqual(data.constructionSites,[]);
+ assert.equal((await f.api.POST(f.request({employee:shared}))).status,403);
+});
 test('individual health prices and fixed insurance reach the budget; health selection requires a price',async()=>{
  const f=fixture(),base={...employee,healthEnabled:true,insuranceEnabled:true,insuranceMonthly:99999,healthEmployeeMonthly:0,healthCopayMonthly:0,healthCopayEmployeeMonthly:0};
  assert.equal((await f.api.POST(f.request({employee:{...base,healthMonthly:0}}))).status,400);
