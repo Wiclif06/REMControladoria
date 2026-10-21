@@ -1,3 +1,4 @@
+export const LIFE_INSURANCE_MONTHLY=777;
 export type CostInput = {
  contract:string; salary:number; meal:number; transport:number;
  chargeRate?:number; inssRate?:number; fgtsRate?:number;
