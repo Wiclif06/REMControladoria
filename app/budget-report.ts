@@ -18,8 +18,8 @@ export function budgetSheet(plans:BudgetPlan[],year:number,stages:readonly Stage
  const rows:string[] = [], merges:string[] = [];
  const detailRowsById=new Map<string,number>(),specialRows=new Map<string,number>();
  const byId = ordered(stages);
- const scopeLabel=plans.length===1?plans[0].sector:'CONSOLIDADO';
- const companyLabel=plans.length===1?plans[0].company:'TODAS AS EMPRESAS';
+ const scopeLabel=new Set(plans.map(p=>p.sector)).size===1?(plans[0]?.sector||'CONSOLIDADO'):'TODAS AS ÁREAS';
+ const companyLabel=new Set(plans.map(p=>p.company)).size===1?(plans[0]?.company||'TODAS AS EMPRESAS'):'TODAS AS EMPRESAS';
  rows.push(excelRow(1,cell(1,0,'REM  /  CONTROLADORIA',45),38));merges.push('A1:O1');
  rows.push(excelRow(2,cell(2,0,`PLANEJAMENTO ORÇAMENTÁRIO  •  ${year}`,45),31));merges.push('A2:O2');
  rows.push(excelRow(3,cell(3,0,'EMPRESA',46)+cell(3,1,companyLabel,46)+cell(3,7,'ÁREA',46)+cell(3,8,scopeLabel,46),29));
