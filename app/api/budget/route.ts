@@ -27,13 +27,14 @@ export async function POST(req:Request){try{
  if(!await db().prepare('SELECT name FROM areas WHERE name=?').bind(b.sector).first())return fail('Selecione uma área cadastrada.');
  const old=await db().prepare('SELECT * FROM budget_plans WHERE year=? AND company=? AND sector=?').bind(b.year,b.company,b.sector).first<BudgetPlan>();
  if((old?.version||0)!==b.version)return fail('O orçamento foi alterado por outro usuário. Recarregue antes de salvar.',409);
- if(m.role!=='admin'&&old&&['submitted','approved'].includes(old.status))return fail('Este orçamento está em revisão ou aprovado. Solicite a reabertura ao Adriano.',403);
+ if(old?.status==='approved'&&b.action!=='return')return fail('Orçamento aprovado e bloqueado. Registre uma justificativa e solicite reabertura antes de alterar.',423);
  if(b.action==='approve'&&old?.status!=='submitted')return fail('Envie o orçamento para revisão antes de aprovar.');
  if(b.action==='return'&&(!old||!['submitted','approved'].includes(old.status)||!b.note.trim()))return fail('Informe o motivo da solicitação de ajustes.');
  if(!b.amounts||typeof b.amounts!=='object'||Array.isArray(b.amounts))return fail('Valores inválidos.');
+ if(b.action==='return'&&old?.status==='approved'&&JSON.stringify(Object.fromEntries(Object.entries(b.amounts).filter(([id])=>!PAYROLL_STAGE_IDS.includes(id))))!==JSON.stringify(Object.fromEntries(Object.entries(old.amounts).filter(([id])=>!PAYROLL_STAGE_IDS.includes(id)))))return fail('Para reabrir o orçamento, não altere os valores no mesmo pedido.',400);
  const allowedStages=m.role==='admin'?BUDGET_STAGES:await allowedBudgetStages(m.sector);const ids=new Set<string>(allowedStages.map(s=>s.id)),amounts:BudgetAmounts={};const employees=await payrollForScope(b.sector,b.company);if(employees.length)PAYROLL_STAGE_IDS.forEach(id=>ids.add(id));if(!ids.size)return fail('A Controladoria ainda não liberou orçamentos para este setor.',403);
  for(const [id,v] of Object.entries(b.amounts)){if(PAYROLL_STAGE_IDS.includes(id))continue;if(!ids.has(id))return fail('Seu setor não tem permissão para preencher esta despesa.',403);if(!Array.isArray(v)||v.length!==12||!v.every(x=>Number.isSafeInteger(x)&&x>=0&&x<=100000000))return fail('Informe valores entre zero e R$ 1.000.000,00 por etapa e mês.');if(v.some(x=>x>0))amounts[id]=v;}
- Object.assign(amounts,payrollAmounts(employees));
+ Object.assign(amounts,b.action==='return'&&old?.status==='approved'?Object.fromEntries(PAYROLL_STAGE_IDS.map(id=>[id,old.amounts[id]||Array(12).fill(0)])):payrollAmounts(employees));
  if(b.action==='submit'&&!Object.values(amounts).some(v=>v.some(x=>x>0)))return fail('Preencha ao menos uma despesa antes de enviar.');
  if(m.role!=='admin'&&old)Object.assign(amounts,Object.fromEntries(Object.entries(old.amounts).filter(([id])=>!ids.has(id)&&!PAYROLL_STAGE_IDS.includes(id))));
  const status=b.action==='submit'?'submitted':b.action==='approve'?'approved':b.action==='return'?'changes':old?.status==='changes'?'changes':'draft';
