@@ -1,17 +1,67 @@
 import {BUDGET_STAGES,MONTHS} from './budget-catalog';
 import {cell,excelRow,worksheet,excelFile,column} from './excel';
-import {sumMonths,STATUS_LABELS,type BudgetPlan} from './budget-types';
-export function budgetSheet(plans:BudgetPlan[],year:number,stages:readonly (typeof BUDGET_STAGES)[number][]=BUDGET_STAGES){
-const rows:string[]=[],merges=['A1:O1','A2:O2'];let n=1;rows.push(excelRow(n,cell(n++,0,'REM CONTROLADORIA',24),30));rows.push(excelRow(n,cell(n++,0,`Orçamento ${year} — Despesas Administrativas`,8),28));rows.push(excelRow(4,['EMPRESA','ORÇAMENTOS',...MONTHS.map(m=>`${m.toUpperCase()} / ${year}`),'TOTAL ANUAL'].map((v,c)=>cell(4,c,v,4)).join(''),30));n=5;const companyRows:number[]=[];for(const company of [...new Set(plans.map(p=>p.company))]){const list=plans.filter(p=>p.company===company),values=Array.from({length:12},(_,m)=>list.reduce((sum,p)=>sum+sumMonths(p.amounts)[m],0));rows.push(excelRow(n,cell(n,0,company)+cell(n,1,list.length)+values.map((v,m)=>cell(n,m+2,v/100,30)).join('')+cell(n,14,values.reduce((a,b)=>a+b,0)/100,31,`SUM(C${n}:N${n})`),26));companyRows.push(n++);}const grand=Array.from({length:12},(_,m)=>plans.reduce((sum,p)=>sum+sumMonths(p.amounts)[m],0));rows.push(excelRow(n,cell(n,0,'TOTAL DAS EMPRESAS',24)+grand.map((v,m)=>cell(n,m+2,v/100,30,companyRows.length?companyRows.map(r=>`${column(m+2)}${r}`).join('+'):'0')).join('')+cell(n,14,grand.reduce((a,b)=>a+b,0)/100,31,`SUM(C${n}:N${n})`),30));n+=3;rows.push(excelRow(n,['ETAPA','DESCRIÇÃO',...MONTHS.map(m=>`${m.toUpperCase()} / ${year}`),'TOTAL'].map((v,c)=>cell(n,c,v,4)).join(''),30));n++;const totalRows:number[]=[];
-for(const plan of plans){rows.push(excelRow(n,cell(n,0,`Área: ${plan.sector} | Empresa: ${plan.company} | ${STATUS_LABELS[plan.status]} | Responsável: ${plan.updated_by}`,24),30));merges.push(`A${n}:O${n}`);n++;let cat='',group='';let categoryRow=0,groupRow=0;let groupDetail:number[]=[];
-const totalRow=(r:number,refs:number[])=>{const values=Array.from({length:12},(_,m)=>refs.reduce((sum,id)=>sum+(plan.amounts[String(id)]?.[m]||0),0)/100);return values.map((v,m)=>cell(r,m+2,v,30,refs.length?refs.map(id=>`${column(m+2)}${stageExcelRows[id]}`).join('+'):'0')).join('')+cell(r,14,values.reduce((a,b)=>a+b,0),31,`SUM(C${r}:N${r})`);};
-const stageExcelRows:Record<number,number>={};const subtotals:{row:number;ids:number[]}[]=[];let catIds:number[]=[];
-for(const stage of stages.filter(s=>(plan.amounts[s.id]||[]).some(v=>v>0))){if(stage.category!==cat){if(categoryRow)subtotals.push({row:categoryRow,ids:catIds});cat=stage.category;catIds=[];categoryRow=n;rows.push(excelRow(n,cell(n,1,cat,24),27));n++;group='';}
-if(stage.group!==group){if(groupRow)subtotals.push({row:groupRow,ids:groupDetail});group=stage.group;groupDetail=[];groupRow=n;rows.push(excelRow(n,cell(n,1,group,8),25));n++;}
-const values=plan.amounts[stage.id]||Array(12).fill(0);stageExcelRows[Number(stage.id)]=n;groupDetail.push(Number(stage.id));catIds.push(Number(stage.id));rows.push(excelRow(n,cell(n,0,stage.code)+cell(n,1,stage.name)+values.map((v,m)=>cell(n,m+2,v/100,30)).join('')+cell(n,14,values.reduce((a,b)=>a+b,0)/100,31,`SUM(C${n}:N${n})`)));n++;}
-if(categoryRow)subtotals.push({row:categoryRow,ids:catIds});if(groupRow)subtotals.push({row:groupRow,ids:groupDetail});for(const sub of subtotals){const idx=rows.findIndex(s=>s.startsWith(`<row r="${sub.row}"`));rows[idx]=rows[idx].replace('</row>',totalRow(sub.row,sub.ids)+'</row>');}
-const totals=sumMonths(plan.amounts);rows.push(excelRow(n,cell(n,1,'TOTAL DO SETOR',24)+totals.map((v,m)=>cell(n,m+2,v/100,30,Object.values(stageExcelRows).map(r=>`${column(m+2)}${r}`).join('+'))).join('')+cell(n,14,totals.reduce((a,b)=>a+b,0)/100,31,`SUM(C${n}:N${n})`),30));totalRows.push(n);n++;rows.push(excelRow(n,cell(n,1,'Observações: '+(plan.note||'—'))));merges.push(`B${n}:O${n}`);n+=3;}
-const totals=Array.from({length:12},(_,m)=>plans.reduce((v,p)=>v+sumMonths(p.amounts)[m],0));rows.push(excelRow(n,cell(n,1,'TOTAL CONSOLIDADO',24)+totals.map((v,m)=>cell(n,m+2,v/100,30,totalRows.length?totalRows.map(r=>`${column(m+2)}${r}`).join('+'):'0')).join('')+cell(n,14,totals.reduce((a,b)=>a+b,0)/100,31,`SUM(C${n}:N${n})`),30));
-return {name:'Orçamento',xml:worksheet(rows,[22,58,...Array(13).fill(17)],merges,4)};}
+import {type BudgetPlan} from './budget-types';
 
-export function makeBudgetReport(plans:BudgetPlan[],year:number,stages:readonly (typeof BUDGET_STAGES)[number][]=BUDGET_STAGES){return excelFile([budgetSheet(plans,year,stages)]);}
+/** All values in BudgetPlan are integer cents. The expense catalog preserves the
+ * original template row ids (6..173); internal automatic categories are appended. */
+type Stage = (typeof BUDGET_STAGES)[number];
+const money = (amount:number) => amount/100;
+const isDetail = (stage:Stage) => /^\d+$/.test(stage.id);
+const ordered = (stages:readonly Stage[]) =>
+ [...stages].filter(isDetail).sort((a,b)=>Number(a.id)-Number(b.id));
+const annual = (v:number[]) => v.reduce((a,b)=>a+b,0);
+const months = Array.from({length:12},(_,i)=>i);
+const amountsFor = (plans:BudgetPlan[],id:string) =>
+ months.map(m=>plans.reduce((sum,p)=>sum+(p.amounts[id]?.[m]||0),0));
+
+export function budgetSheet(plans:BudgetPlan[],year:number,stages:readonly Stage[]=BUDGET_STAGES,name='Despesas Administrativas'){
+ const rows:string[] = [], merges:string[] = [];\n const detailRowsById=new Map<string,number>(),specialRows=new Map<string,number>();
+ const byId = ordered(stages);
+ const scopeLabel=plans.length===1?plans[0].sector:'CONSOLIDADO';
+ const companyLabel=plans.length===1?plans[0].company:'TODAS AS EMPRESAS';
+ rows.push(excelRow(1,cell(1,0,'Área:')+cell(1,1,scopeLabel)+cell(1,2,'Gestor:')+cell(1,3,'Controladoria')+cell(1,7,'Empresa:')+cell(1,8,companyLabel),27));
+ rows.push(excelRow(2,cell(2,1,`ORÇAMENTO ${year} — DESPESAS ADMINISTRATIVAS`,24),28));
+ merges.push('B2:O2');
+ rows.push(excelRow(3,['ETAPA','DESCRIÇÃO',...MONTHS.map(m=>`${m} / ${year}`),'Total'].map((label,i)=>cell(3,i,label,4)).join(''),30));
+ let n=4,category='',group='';
+ type Subtotal={row:number;detailRows:number[]};
+ const categories:Subtotal[]=[],groups:Subtotal[]=[];
+ let currentCategory:Subtotal|null=null,currentGroup:Subtotal|null=null;
+ const append=(r:number,values:string,height=23)=>rows.push(excelRow(r,values,height));
+ const finishGroup=()=>{if(currentGroup)groups.push(currentGroup);currentGroup=null};
+ const finishCategory=()=>{finishGroup();if(currentCategory)categories.push(currentCategory);currentCategory=null};
+ for(const s of byId){
+   if(s.category!==category){finishCategory();category=s.category;group='';currentCategory={row:n,detailRows:[]};append(n,cell(n,1,category,24),28);n++;}
+   if(s.group!==group){finishGroup();group=s.group;currentGroup={row:n,detailRows:[]};append(n,cell(n,1,group,8),25);n++;}
+   const values=amountsFor(plans,s.id);
+   detailRowsById.set(s.id,n);currentCategory!.detailRows.push(n);currentGroup!.detailRows.push(n);
+   append(n,cell(n,0,s.code)+cell(n,1,s.name)+values.map((v,m)=>cell(n,m+2,money(v),30)).join('')+cell(n,14,money(annual(values)),31,`SUM(C${n}:N${n})`));
+   n++;
+ }
+ finishCategory();
+ // Automatic bookkeeping items without an accounting code are explicitly listed,
+ // rather than silently disappearing from the consolidated export.
+ const special=stages.filter(s=>!isDetail(s)&&plans.some(p=>p.amounts[s.id]?.some(v=>v!==0)));
+ if(special.length){
+  const title=n++;append(title,cell(title,1,'OUTROS LANÇAMENTOS AUTOMÁTICOS',24),28);
+  const st:Subtotal={row:title,detailRows:[]};categories.push(st);
+  for(const s of special){const values=amountsFor(plans,s.id);st.detailRows.push(n);specialRows.set(s.id,n);
+   append(n,cell(n,0,s.code)+cell(n,1,s.name)+values.map((v,m)=>cell(n,m+2,money(v),30)).join('')+cell(n,14,money(annual(values)),31,`SUM(C${n}:N${n})`));n++;}
+ }
+ for(const subtotal of [...groups,...categories]){
+  const r=subtotal.row, refs=subtotal.detailRows;
+  const values=months.map(m=>refs.reduce((sum,detailRow)=>{const stage=stages.find(s=>detailRowsById.get(s.id)===detailRow||specialRows.get(s.id)===detailRow);return sum+(stage?amountsFor(plans,stage.id)[m]:0);},0));
+  const idx=rows.findIndex(row=>row.startsWith(`<row r="${r}"`));
+  if(idx>=0)rows[idx]=rows[idx].replace('</row>',values.map((v,m)=>cell(r,m+2,money(v),30,refs.length?refs.map(rr=>`${column(m+2)}${rr}`).join('+'):'0')).join('')+cell(r,14,money(annual(values)),31,`SUM(C${r}:N${r})`)+ '</row>');
+ }
+ const totalRows=categories.map(c=>c.row);
+ const total=months.map(m=>stages.reduce((sum,s)=>sum+amountsFor(plans,s.id)[m],0));
+ append(n,cell(n,1,'TOTAL GERAL',24)+total.map((v,m)=>cell(n,m+2,money(v),30,totalRows.map(rr=>`${column(m+2)}${rr}`).join('+')||'0')).join('')+cell(n,14,money(annual(total)),31,`SUM(C${n}:N${n})`),30);
+ return {name,xml:worksheet(rows,[21,63,...Array(13).fill(18)],merges,3)};
+}
+export function makeBudgetReport(plans:BudgetPlan[],year:number,stages:readonly Stage[]=BUDGET_STAGES){
+ const sheets=[budgetSheet(plans,year,stages,'Consolidado')];
+ const companies=[...new Set(plans.map(p=>p.company))];
+ for(const company of companies) sheets.push(budgetSheet(plans.filter(p=>p.company===company),year,stages,company.slice(0,31)));
+ return excelFile(sheets);
+}
