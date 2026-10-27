@@ -78,7 +78,7 @@ export function budgetSheet(plans:BudgetPlan[],year:number,stages:readonly Stage
   rows[index]=rows[index].replace('</row>',sums.map((v,m)=>cell(h.row,m+2,CENTS(v),h.type==='category'?54:30,detailRows.length?detailRows.map(r=>`${column(m+2)}${r}`).join('+'):'0')).join('')+cell(h.row,14,CENTS(total(sums)),h.type==='category'?54:31,`SUM(C${h.row}:N${h.row})`)+ '</row>');
  }
  let nextRow=174;
- const extras=stages.filter(s=>!/^\d+$/.test(s.id)&&plans.some(p=>p.amounts[s.id]?.some(v=>v!==0)));
+ const extras=stages.filter(s=>(!/^\d+$/.test(s.id)||Number(s.id)>173)&&plans.some(p=>p.amounts[s.id]?.some(v=>v!==0)));
  const extraRows:number[]=[];
  if(extras.length){
   rows.push(excelRow(nextRow,cell(nextRow,1,'OUTROS CUSTOS AUTOMÁTICOS',24),28));categoryRows.push(nextRow++);
