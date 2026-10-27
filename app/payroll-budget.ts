@@ -15,5 +15,5 @@ export function payrollAmounts(employees:PayrollEmployee[]):BudgetAmounts{
 export function withPayroll(plans:BudgetPlan[],employees:PayrollEmployee[],year:number):BudgetPlan[]{
  const byScope=new Map(plans.map(p=>[JSON.stringify([p.company,p.sector]),p]));
  for(const e of employees){const key=JSON.stringify([e.company,e.sector]);if(!byScope.has(key))byScope.set(key,{year,company:e.company,sector:e.sector,amounts:{},status:'draft',version:0,note:'',updated_by:'Cadastro de funcionários',updated_at:new Date().toISOString()});}
- return [...byScope.values()].map(p=>({...p,amounts:{...p.amounts,...payrollAmounts(employees.filter(e=>e.company===p.company&&e.sector===p.sector))}}));
+ return [...byScope.values()].map(p=>({...p,amounts:p.status==='approved'?p.amounts:{...p.amounts,...payrollAmounts(employees.filter(e=>e.company===p.company&&e.sector===p.sector))}}));
 }
