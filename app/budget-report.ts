@@ -57,7 +57,7 @@ export function budgetSheet(plans:BudgetPlan[],year:number,stages:readonly Stage
  const totalRows=categories.map(c=>c.row);
  const total=months.map(m=>stages.reduce((sum,s)=>sum+amountsFor(plans,s.id)[m],0));
  append(n,cell(n,0,'TOTAL GERAL',45)+cell(n,1,'ORÇAMENTO CONSOLIDADO',45)+total.map((v,m)=>cell(n,m+2,money(v),53,totalRows.map(rr=>`${column(m+2)}${rr}`).join('+')||'0')).join('')+cell(n,14,money(annual(total)),53,`SUM(C${n}:N${n})`),36);
- return {name,xml:worksheet(rows,[23,64,...Array(12).fill(18),22],merges,5)};
+ return {name,xml:worksheet(rows,[22,63,...Array(12).fill(18),22],merges,5)};
 }
 export function makeBudgetReport(plans:BudgetPlan[],year:number,stages:readonly Stage[]=BUDGET_STAGES){
  const sheets=[budgetSheet(plans,year,stages,'Consolidado')];
