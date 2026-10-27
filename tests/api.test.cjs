@@ -72,7 +72,7 @@ test('work filter exports only its personnel while sector budget still sums all 
  assert(xml.includes('Pessoa Bom'));assert(!xml.includes('Pessoa Altitude'));assert(!files['xl/worksheets/sheet2.xml']);
  assert.equal((await api.GET(new Request('http://localhost:3100/api/export?constructionSite=Unknown'))).status,400);
  const full=unzipSync(new Uint8Array(await(await api.GET(new Request('http://localhost:3100/api/export'))).arrayBuffer()));
- const personnel=strFromU8(full['xl/worksheets/sheet2.xml']);assert(personnel.includes('Obra: Bom Retiro'));assert(personnel.includes('Obra: Altitude Jardins'));
+ const personnel=strFromU8(full['xl/worksheets/sheet'+Object.keys(full).filter(x=>/^xl\/worksheets\/sheet\d+\.xml$/.test(x)).length+'.xml']);assert(personnel.includes('Obra: Bom Retiro'));assert(personnel.includes('Obra: Altitude Jardins'));
 });
 test('save/reopen keeps health and task, server overrides submitted charges, old vacation dates remain untouched',async()=>{
  const f=fixture('manager');let res=await f.api.POST(f.request({employee:{...employee,chargeRate:0,inssRate:0}}));assert.equal(res.status,200);
@@ -114,5 +114,28 @@ test('admin budget and Excel use the same saved payroll components',async()=>{
  const exportResponse=await f.load('app/api/export/route.ts').GET(new Request('http://localhost:3100/api/export?year=2027'));
  assert.equal(exportResponse.status,200);const {unzipSync,strFromU8}=require('fflate'),files=unzipSync(new Uint8Array(await exportResponse.arrayBuffer()));
  assert(strFromU8(files['xl/worksheets/sheet1.xml']).includes('TAREFA'));
- assert(strFromU8(files['xl/worksheets/sheet2.xml']).includes('SAÚDE LÍQUIDA'));
+ assert(Object.entries(files).some(([path,bytes])=>/^xl\/worksheets\/sheet\d+\.xml$/.test(path)&&strFromU8(bytes).includes('SAÚDE LÍQUIDA')));
+});
+
+test('budget Excel reconciles monthly and annual totals after manual amount changes',async()=>{
+ const f=fixture();
+ const {budgetSheet}=f.load('app/budget-report.ts');
+ const plan=(value)=>({year:2027,company:'REM Construtora',sector:'Engenharia',amounts:{'7':[value,...Array(11).fill(0)],'39':Array(12).fill(2200)},status:'draft',version:1,note:'',updated_by:'test.user'});
+ const {unzipSync,strFromU8}=require('fflate'),{excelFile}=f.load('app/excel.ts');
+ for(const amount of [15000,45000]){
+  const xml=budgetSheet([plan(amount)],2027).xml;
+  const total=(amount+12*2200)/100;
+  assert(xml.includes('ORÇAMENTO 2027'));
+  assert(xml.includes('ADIANTAMENTO DE SALÁRIOS'));
+  assert(xml.includes('TREINAMENTO'));
+  assert(xml.includes('<v>'+total+'</v>'),'annual total must match all monthly saved amounts');
+  const book=unzipSync(excelFile([budgetSheet([plan(amount)],2027)]));
+  assert(strFromU8(book['xl/worksheets/sheet1.xml']).includes('TOTAL GERAL'));
+ }
+});
+test('approved payroll snapshot is not recalculated after employee changes',async()=>{
+ const f=fixture(),{withPayroll}=f.load('app/payroll-budget.ts');
+ const snapshot={year:2027,company:'REM Construtora',sector:'Engenharia',status:'approved',amounts:{'6':Array(12).fill(125000)},version:2};
+ const output=withPayroll([snapshot],[{...employee,salary:900000}],2027);
+ assert.deepEqual(output[0].amounts['6'],snapshot.amounts['6']);
 });
